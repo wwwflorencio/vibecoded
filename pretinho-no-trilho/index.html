@@ -53,7 +53,7 @@
   <p>Fim do dia. Um gato preto de skate atravessa os trilhos da CPTM pra chegar em casa antes de escurecer.</p>
   <p>Onde fica a casa do Pretinho? <b style="color:#f2c21b" id="homeName"></b></p>
   <div id="pick"></div>
-  <p class="ctrl">Celular: desliza ←/→ troca de trilho · ↑ pula · ↓ abaixa<br>toque = pulo · <b>toque no ar = manobra</b> · <b>segura a tela = acelera</b><br>Teclado: setas/WASD · ESPAÇO pula e faz manobra no ar · SHIFT acelera</p>
+  <p class="ctrl">Celular: desliza ←/→ troca de trilho · ↑ pula · ↓ abaixa<br>toque = pulo · <b>toque no ar = manobra</b> · <b>segura a tela = acelera</b><br>Nas estações: rampas e manobra vale x2 com a torcida!<br>Teclado: setas/WASD · ESPAÇO pula e faz manobra no ar · SHIFT acelera</p>
   <button id="start" class="btn">PARTIU, LUZ!</button>
 </div>
 <div id="endov" class="ov hidden">
@@ -516,6 +516,7 @@ S.swish = () => nz(0.1, 0.12, 'bandpass', 2200, undefined, sfxG, 2);
 S.horn = () => { tone('sawtooth', 220, null, 0.5, 0.12); tone('sawtooth', 277, null, 0.5, 0.1); };
 S.ding = () => { if (!ac) return; [880, 698, 587].forEach((f, i) => tone('sine', f, null, 0.5, 0.18, ac.currentTime + i * 0.35)); };
 S.meow = () => tone('triangle', 760, 480, 0.4, 0.16);
+S.crowd = (big) => { if (!ac) return; nz(big ? 1.4 : 0.8, big ? 0.35 : 0.2, 'bandpass', 1100, undefined, sfxG, 0.7); nz(big ? 1.2 : 0.6, 0.12, 'bandpass', 2600, undefined, sfxG, 1); if (big) { tone('sine', 1800, 2600, 0.25, 0.08, ac.currentTime + 0.1); tone('sine', 2600, 1800, 0.25, 0.08, ac.currentTime + 0.4); } };
 
 // ---------- cat on a skateboard ----------
 function buildCat() {
@@ -557,6 +558,31 @@ function train(lane, d0, len, v = 0) {
   if (v) for (const s of [-0.6, 0.6]) part(g, 0.3, 0.2, 0.1, M3.lamp, s, 0.9, 0.06);
   g.position.set(laneX(lane), 0, -d0);
   return addObj({ type: 'train', lane, d0, d1: d0 + cars * 8, top: 3.15, g, v, honked: false });
+}
+function kicker(lane, d1) {
+  const len = 3, h = 1.15, g = new THREE.Group();
+  const m = box(2.0, 0.2, Math.hypot(len, h), M3.deck); m.rotation.x = Math.atan2(h, len); g.add(m);
+  const s1 = box(2.0, h, 0.12, M3.hazard); s1.position.set(0, 0, -len / 2); g.add(s1);
+  g.position.set(laneX(lane), h / 2, -(d1 - len / 2));
+  for (let i = 0; i < 7; i++) fish(lane, d1 + 2 + i * 1.7, 1.6 + Math.sin(i / 6 * Math.PI) * 3.4);
+  return addObj({ type: 'kick', lane, d0: d1 - len, d1, top: h, g, used: false });
+}
+let crowd = [];
+const SHIRTS = [0xf04e23, 0xf2c21b, 0x00a85a, 0x0089b8, 0x6a3ad8, 0xe8307a, 0xffffff, 0x1b3f8b].map(c => psx({ color: c }));
+const SKINS = [0x5a3a26, 0x7a4e32, 0xa86e48, 0xc89470, 0xe8c0a0].map(c => psx({ color: c }));
+const PANTS = [0x2a2e3a, 0x3a5a8a, 0x5a4a3a].map(c => psx({ color: c }));
+const signTexts = ['MIAU!', 'VAI PRETINHO!', 'GATO DO TRILHO', '10/10', 'MANDA O FLIP!'];
+const SIGN_MATS = signTexts.map(t => psx({ map: tex(64, 24, (g, w, h) => { g.fillStyle = '#fff6d0'; g.fillRect(0, 0, w, h); g.fillStyle = '#f04e23'; g.font = `bold ${t.length > 10 ? 7 : 10}px monospace`; g.textAlign = 'center'; g.fillText(t, w / 2, 15); }, false), unlit: true }));
+function fan(parent, x, z, face) {
+  const g = new THREE.Group(); g.position.set(x, 1.1, z); g.rotation.y = face; parent.add(g);
+  const shirt = SHIRTS[Math.floor(Math.random() * SHIRTS.length)], skin = SKINS[Math.floor(Math.random() * SKINS.length)];
+  part(g, 0.34, 0.6, 0.22, PANTS[Math.floor(Math.random() * PANTS.length)], 0, 0.3, 0);
+  part(g, 0.42, 0.55, 0.26, shirt, 0, 0.88, 0);
+  part(g, 0.28, 0.3, 0.28, skin, 0, 1.32, 0); part(g, 0.3, 0.1, 0.3, rnd() < 0.5 ? M.black : PANTS[2], 0, 1.5, 0.01);
+  const arms = [-1, 1].map(s => limb(g, 0.11, 0.5, 0.12, shirt, s * 0.27, 1.1, 0));
+  let sign = null;
+  if (Math.random() < 0.15) { sign = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.34), SIGN_MATS[Math.floor(Math.random() * SIGN_MATS.length)]); sign.position.set(0, 1.95, -0.05); sign.rotation.y = Math.PI; g.add(sign); arms[0].rotation.x = arms[1].rotation.x = Math.PI; }
+  crowd.push({ g, arms, sign, ph: Math.random() * 6, by: 1.1 });
 }
 function ramp(lane, d1) {
   const len = 7, h = 3.15, g = new THREE.Group();
@@ -607,7 +633,7 @@ function genRow(d) {
     let placed = 0;
     for (const l of free) if (Math.random() < 0.72 + hard * 0.28) { const k = Math.random() < 0.55 ? 'low' : 'high'; barrier(l, d, k); placed++; if (k === 'low' && Math.random() < 0.6) fishArc(l, d); else if (k === 'high') fishLine(l, d - 3, d + 3, 0.5); }
     if (!placed) fishLine(free[0], d, d + 10);
-  } else if (r < 0.9 && P.d > 120) {
+  } else if (r < 0.9 && P.d > 120 && !STATIONS.some((_, k) => { const sd = stationD(k); return sd > d - 40 && sd < d + 130; })) {
     const l = free[0], len = [16, 24][Math.floor(Math.random() * 2)];
     train(l, d + 85, len, 12 + hard * 7); busy[l] = d + 130;
     if (free[1] !== undefined) fishLine(free[1], d, d + 12);
@@ -722,7 +748,10 @@ function station(k) {
     if (home) for (let i = 0; i < 18; i++) part(g, 0.18, 0.18, 0.18, pm([0xf04e23, 0xf2c21b, 0x00a85a, 0x0089b8][i % 4]), s * 3.9, 4.6 + Math.sin(i) * 0.15, -STATION_HALF + 2 + i * 3.6);
   }
   const big = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), sign); big.position.set(0, 7.6, STATION_HALF - 2); g.add(big);
-  world.add(g); objs.push({ type: 'scen', g, d0: d - STATION_HALF, d1: d + STATION_HALF });
+  for (const s of [-1, 1]) for (let z = -STATION_HALF + 3; z < STATION_HALF - 3; z += rr(1.2, 1.9)) for (const row of [0, 1]) if (Math.random() < 0.8) fan(g, s * (4.45 + row * 0.8 + rr(-0.1, 0.1)), z + rr(-0.3, 0.3), s > 0 ? Math.PI / 2 : -Math.PI / 2);
+  for (const s of [-1, 1]) { const ban = box(0.1, 0.8, 10, M3.coral); ban.position.set(s * 6.3, 4.2, 0); g.add(ban); }
+  world.add(g); objs.push({ type: 'scen', g, d0: d - STATION_HALF, d1: d + STATION_HALF, crowdK: k });
+  if (k !== startIdx && k !== homeIdx) { kicker(1, d - 20); kicker(0, d - 4); kicker(2, d - 4); kicker(1, d + 12); }
 }
 
 // ---------- player ----------
@@ -730,7 +759,7 @@ const P = { d: 0, x: 0, lane: 1, prevLane: 1, y: 0, vy: 0, rollT: 0, inv: 0, hea
 let state = 'title', hurtFlash = 0, playTime = 0, toastT = 0, stationsBuilt = new Set();
 function toast(html, dur = 2.5) { $('toast').innerHTML = html; $('toast').classList.add('show'); toastT = dur; }
 const TRICKS = ['KICKFLIP', 'SHOVE-IT', 'HEELFLIP', 'GATO 360'];
-let popT = 0;
+let popT = 0, cheer = 0, crowdNear = false;
 function pop(main, sub = '') { $('pop').innerHTML = main + (sub ? `<small>${sub}</small>` : ''); $('pop').classList.add('show'); popT = 0.9; }
 function setHud() {
   $('score').textContent = `PTS ${P.score}` + (P.combo > 1 ? ` · x${P.combo}` : '');
@@ -745,7 +774,7 @@ function setHud() {
 
 function resetRun(fromIdx) {
   scene.remove(world); world = new THREE.Group(); scene.add(world);
-  objs = []; busy = [0, 0, 0]; stationsBuilt = new Set(); stadiumBuilt = false; fishN = 0;
+  objs = []; crowd = []; busy = [0, 0, 0]; stationsBuilt = new Set(); stadiumBuilt = false; fishN = 0;
   P.d = stationD(fromIdx); P.passed = fromIdx; P.check = fromIdx;
   P.x = 0; P.lane = 1; P.prevLane = 1; P.y = 0; P.vy = 0; P.rollT = 0; P.inv = 1; P.hearts = 3; P.turboT = 0; P.slowT = 0;
   nextRow = P.d + 40; genScen = Math.floor((P.d - 40) / 20) * 20; nextTurbo = P.d + rr(250, 450);
@@ -801,10 +830,10 @@ function crash(o, msg) {
 const groundAt = () => {
   let gh = 0;
   for (const o of objs) {
-    if ((o.type !== 'train' && o.type !== 'ramp') || Math.abs(P.x - laneX(o.lane)) > 1.15) continue;
+    if ((o.type !== 'train' && o.type !== 'ramp' && o.type !== 'kick') || Math.abs(P.x - laneX(o.lane)) > 1.15) continue;
     if (P.d < o.d0 - 0.3 || P.d > o.d1 + 0.3) continue;
     if (o.type === 'train' && P.y >= o.top - 0.45) gh = Math.max(gh, o.top);
-    if (o.type === 'ramp') { const h = clamp((P.d - o.d0) / (o.d1 - o.d0), 0, 1) * o.top; if (P.y >= h - 0.7) gh = Math.max(gh, h); }
+    if (o.type === 'ramp' || o.type === 'kick') { const h = clamp((P.d - o.d0) / (o.d1 - o.d0), 0, 1) * o.top; if (P.y >= h - 0.7) gh = Math.max(gh, h); }
   }
   return gh;
 };
@@ -823,7 +852,7 @@ function update(dt) {
   if (jumpQ && grounded) { P.vy = 13.5; P.rollT = 0; S.ollie(); P.trickT = 99; }
   else if (jumpQ && !grounded && P.trickT >= TD) { P.trick = Math.floor(Math.random() * TRICKS.length); P.trickT = 0; S.swish(); }
   const wasTrick = P.trickT < TD; P.trickT += dt;
-  if (wasTrick && P.trickT >= TD) { P.combo++; const pts = 100 * P.combo; P.score += pts; S.fish(); tone('square', 600 + P.combo * 80, 900 + P.combo * 120, 0.12, 0.12); pop(`${TRICKS[P.trick]} +${pts}`, P.combo > 1 ? `COMBO x${P.combo}` : ''); setHud(); }
+  if (wasTrick && P.trickT >= TD) { P.combo++; const inSt = inStation(P.d); const pts = 100 * P.combo * (inSt ? 2 : 1); if (inSt) { cheer = 1.6; S.crowd(true); } P.score += pts; S.fish(); tone('square', 600 + P.combo * 80, 900 + P.combo * 120, 0.12, 0.12); pop(`${TRICKS[P.trick]} +${pts}`, (inSt ? 'ESTAÇÃO x2 · ' : '') + (P.combo > 1 ? `COMBO x${P.combo}` : '')); setHud(); }
   jumpQ = false;
   if (rollQ) { if (!grounded) P.vy = -28; P.rollT = 0.6; S.roll(); }
   rollQ = false; P.rollT -= dt;
@@ -832,6 +861,7 @@ function update(dt) {
   // collisions
   for (const o of objs) {
     if (o.hit || o.type === 'scen' || o.type === 'ramp') continue;
+    if (o.type === 'kick') { if (!o.used && Math.abs(P.x - laneX(o.lane)) < 1.1 && P.d >= o.d1 - 0.45 && P.d <= o.d1 + 0.4 && P.y >= o.top - 0.3) { o.used = true; P.vy = 17.5; P.y = o.top; S.ollie(); pop('AÉREO!', 'toca na tela pra manobrar'); cheer = 0.6; } continue; }
     const ox = laneX(o.lane), near = Math.abs(P.x - ox);
     if (o.type === 'fish' || o.type === 'turbo') {
       const mag = P.turboT > 0 ? 7 : 0;
@@ -899,9 +929,9 @@ function updateCamera(dt, time) {
     camera.position.set(Math.sin(a) * 3.2, 1.6, -P.d + Math.cos(a) * 3.2); camera.lookAt(0, 0.8, -P.d); return;
   }
   const portrait = camera.aspect < 1;
-  const tx = P.x * 0.6, ty = P.y * 0.6 + (portrait ? 4.4 : 3.5), tz = -P.d + (portrait ? 7.5 : 6.2), k = 1 - Math.exp(-8 * dt);
+  const tx = P.x * 0.6, ty = P.y * 0.92 + (portrait ? 4.4 : 3.5), tz = -P.d + (portrait ? 7.5 : 6.2), k = 1 - Math.exp(-8 * dt);
   camera.position.x += (tx - camera.position.x) * k; camera.position.y += (ty - camera.position.y) * k; camera.position.z = tz;
-  camera.lookAt(P.x * 0.7, P.y * 0.5 + 1.0, -P.d - 7);
+  camera.lookAt(P.x * 0.7, P.y * 0.85 + 1.0, -P.d - 7);
 }
 
 // ---------- flow ----------
@@ -952,6 +982,18 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; const time = now / 1000;
   if (state === 'play') { playTime += dt; update(dt); } else { jumpQ = rollQ = false; }
   for (const o of objs) if ((o.type === 'fish' || o.type === 'turbo') && !o.hit) { o.g.rotation.y = time * 3 + (o.ph || 0); }
+  cheer = Math.max(0, cheer - dt * 0.8);
+  if (crowd.length) {
+    crowd = crowd.filter(f => f.g.parent && f.g.parent.parent);
+    const near = inStation(P.d) || inStation(P.d + 25);
+    if (near && state === 'play' && !crowdNear) S.crowd(false); crowdNear = near && state === 'play';
+    for (const f of crowd) {
+      const e = near ? 0.35 + cheer : 0.05;
+      f.g.position.y = f.by + Math.max(0, Math.sin(time * (7 + cheer * 4) + f.ph)) * 0.25 * e;
+      if (!f.sign) { const a = near ? -2.4 - Math.sin(time * 9 + f.ph) * 0.5 * (0.5 + cheer) : -0.1; f.arms[0].rotation.x = a; f.arms[1].rotation.x = near ? -2.4 - Math.sin(time * 9 + f.ph + 1) * 0.5 * (0.5 + cheer) : -0.1; }
+      else f.sign.position.y = 1.95 + Math.sin(time * 6 + f.ph) * 0.08 * (near ? 1 : 0);
+    }
+  }
   for (const k of kites) { k.m.position.y = k.y + Math.sin(time * 1.3 + k.ph) * 0.6; k.m.rotation.z = Math.sin(time * 2 + k.ph) * 0.3; }
   animateCat(dt, time); updateParts(dt); updateSky(); updateCamera(dt, time); music();
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.remove('show'); }

@@ -1,1 +1,16 @@
+# macOS
+.DS_Store
+._*
+
+# Vercel
 .vercel
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Logs / env
+*.log
+.env*
+node_modules/
